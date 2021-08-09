@@ -1,6 +1,7 @@
 use core::panic;
 use std::borrow::BorrowMut;
 
+use float_cmp::approx_eq;
 use image::{ImageBuffer, Rgba, RgbaImage, imageops, io::Reader as ImageReader};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -48,13 +49,25 @@ impl FnLine {
     #[inline]
     // Check if a point is below a given line
     pub fn below(&self, p: Point) -> bool {
-        p.y <= self.eval(p.x)
+        p.y <= self.eval(p.x) && !self.on_line(p)
     }
 
     #[inline]
     pub fn above(&self, p: Point) -> bool {
-        !self.below(p)
+        p.y >= self.eval(p.x) && !self.on_line(p)
+    }
 
+    pub fn on_line(&self, p: Point) -> bool {
+        let line_y = self.eval(p.x);
+        approx_eq!(f32, line_y, p.y)
+    }
+
+    pub fn above_or_on_line(&self, p: Point) -> bool {
+        self.above(p) || self.on_line(p) 
+    }
+
+    pub fn below_or_on_line(&self, p: Point) -> bool {
+        self.below(p) || self.on_line(p) 
     }
 }
 
@@ -96,12 +109,12 @@ fn main() {
     // Top-left triangle
     let (tr1_p1, tr1_p2) = (
         Point::new(0.0, length_corner_triangle_vertical),
-        Point::new(length_corner_triangle_horizontal, 0.0));
+        Point::new(length_corner_triangle_horizontal, -1.0));
     let tr1_line = FnLine::from_points(tr1_p1, tr1_p2);
 
     // Top right triangle
     let (tr2_p1, tr2_p2) = (
-        Point::new(length_corner_triangle_horizontal, 0.0),
+        Point::new(length_corner_triangle_horizontal, -1.0),
         Point::new(2.0 * inradius, length_corner_triangle_vertical));
     let tr2_line = FnLine::from_points(tr2_p1, tr2_p2);
 
@@ -120,7 +133,10 @@ fn main() {
     // Check if any given point is inside any of the defined triangles, fill with alpha if true
     // Not the best implementation, but will work
     let should_be_alpha = |p: Point| -> bool {
-        tr1_line.below(p) || tr2_line.below(p) || tr3_line.above(p) || tr4_line.above(p)
+        tr1_line.below(p) ||
+         tr2_line.below(p) ||
+          tr3_line.above(p) ||
+           tr4_line.above(p)
     };
 
     println!("Image size: {0}/{1}", image_width as u32, image_height as u32);
